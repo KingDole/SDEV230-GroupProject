@@ -1,18 +1,21 @@
 #include <windows.h>
 #include <commctrl.h>
 #include <string>
-#include <vector>
 #include <sstream>
 #include <iomanip>
+#include <commdlg.h>
+#include "DataTable.h"
+#include "SpreadsheetStorage.h"
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "user32.lib")
 
 // Control IDs
-#define ID_LISTVIEW 1001
 #define ID_BTN_ADD 2001
 #define ID_BTN_DELETE 2002
 #define ID_BTN_EDIT 2003
+#define ID_BTN_SAVE  2005
+#define ID_BTN_LOAD  2006
 #define ID_BTN_SUMMARY 2004
 #define ID_STATIC_SUMMARY 3001
 
@@ -27,221 +30,19 @@
 #define IDC_BTN_OK 4008
 #define IDC_BTN_CANCEL 4009
 
-// Structure to hold row data
-struct DataRow {
-    std::string category;
-    std::string item;
-    std::string material;
-    std::string description;
-    std::string quantity;
-    std::string unitCost;
-    std::string cost;
-    std::string notes;
-};
-
-#include <windows.h>
-#include <string>
-
-std::wstring ToWide(const std::string& s)
-{
-    if (s.empty())
-        return L"";
-
-    int size = MultiByteToWideChar(
-        CP_UTF8,          // encoding
-        0,
-        s.c_str(),
-        -1,
-        nullptr,
-        0
-    );
-
-    std::wstring result(size - 1, L'\0');
-
-    MultiByteToWideChar(
-        CP_UTF8,
-        0,
-        s.c_str(),
-        -1,
-        result.data(),
-        size
-    );
-
-    return result;
-}
-
-std::string ToNarrow(const std::wstring& ws)
-{
-    if (ws.empty())
-        return "";
-
-    int size = WideCharToMultiByte(
-        CP_UTF8,
-        0,
-        ws.c_str(),
-        -1,
-        nullptr,
-        0,
-        nullptr,
-        nullptr
-    );
-
-    std::string result(size - 1, '\0');
-
-    WideCharToMultiByte(
-        CP_UTF8,
-        0,
-        ws.c_str(),
-        -1,
-        result.data(),
-        size,
-        nullptr,
-        nullptr
-    );
-
-    return result;
-}
-
-
-// Global variables for dialog
-DataRow g_dialogData;
-bool g_dialogResult = false;
-
-// DataTable class
-class DataTable {
-private:
-    HWND hListView;
-    std::vector<DataRow> rows;
-
-public:
-    DataTable(HWND hwnd, int x, int y, int width, int height) {
-        hListView = CreateWindowEx(0, WC_LISTVIEW, L"",
-            WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_EDITLABELS | WS_BORDER,
-            x, y, width, height,
-            hwnd, (HMENU)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
-
-        ListView_SetExtendedListViewStyle(hListView, 
-            LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
-
-        LVCOLUMN lvc = {};
-        lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
-
-        const wchar_t* headers[] = {
-            L"Category", L"Item", L"Material", L"Description",
-            L"Quantity", L"Unit Cost", L"Cost", L"Notes"
-        };
-        int widths[] = { 100, 120, 100, 150, 80, 90, 90, 150 };
-
-        for (int i = 0; i < 8; i++) {
-            lvc.iSubItem = i;
-            lvc.pszText = (LPWSTR)headers[i];
-            lvc.cx = widths[i];
-            ListView_InsertColumn(hListView, i, &lvc);
-        }
-    }
-
-    void AddRow(const DataRow& row) {
-        rows.push_back(row);
-        int index = rows.size() - 1;
-
-        LVITEM lvi = {};
-        lvi.mask = LVIF_TEXT;
-        lvi.iItem = index;
-        lvi.iSubItem = 0;
-        
-        std::wstring wCategory(row.category.begin(), row.category.end());
-        std::wstring wItem(row.item.begin(), row.item.end());
-        std::wstring wMaterial(row.material.begin(), row.material.end());
-        std::wstring wDescription(row.description.begin(), row.description.end());
-        std::wstring wQuantity(row.quantity.begin(), row.quantity.end());
-        std::wstring wUnitCost(row.unitCost.begin(), row.unitCost.end());
-        std::wstring wCost(row.cost.begin(), row.cost.end());
-        std::wstring wNotes(row.notes.begin(), row.notes.end());
-        
-        lvi.pszText = const_cast<LPWSTR>(wCategory.c_str());
-        ListView_InsertItem(hListView, &lvi);
-
-        ListView_SetItemText(hListView, index, 1, const_cast<LPWSTR>(wItem.c_str()));
-        ListView_SetItemText(hListView, index, 2, const_cast<LPWSTR>(wMaterial.c_str()));
-        ListView_SetItemText(hListView, index, 3, const_cast<LPWSTR>(wDescription.c_str()));
-        ListView_SetItemText(hListView, index, 4, const_cast<LPWSTR>(wQuantity.c_str()));
-        ListView_SetItemText(hListView, index, 5, const_cast<LPWSTR>(wUnitCost.c_str()));
-        ListView_SetItemText(hListView, index, 6, const_cast<LPWSTR>(wCost.c_str()));
-        ListView_SetItemText(hListView, index, 7, const_cast<LPWSTR>(wNotes.c_str()));
-    }
-
-    void UpdateRow(int index, const DataRow& row) {
-        if (index >= 0 && index < (int)rows.size()) {
-            rows[index] = row;
-            
-            std::wstring wCategory(row.category.begin(), row.category.end());
-            std::wstring wItem(row.item.begin(), row.item.end());
-            std::wstring wMaterial(row.material.begin(), row.material.end());
-            std::wstring wDescription(row.description.begin(), row.description.end());
-            std::wstring wQuantity(row.quantity.begin(), row.quantity.end());
-            std::wstring wUnitCost(row.unitCost.begin(), row.unitCost.end());
-            std::wstring wCost(row.cost.begin(), row.cost.end());
-            std::wstring wNotes(row.notes.begin(), row.notes.end());
-
-            ListView_SetItemText(hListView, index, 0, const_cast<LPWSTR>(wCategory.c_str()));
-            ListView_SetItemText(hListView, index, 1, const_cast<LPWSTR>(wItem.c_str()));
-            ListView_SetItemText(hListView, index, 2, const_cast<LPWSTR>(wMaterial.c_str()));
-            ListView_SetItemText(hListView, index, 3, const_cast<LPWSTR>(wDescription.c_str()));
-            ListView_SetItemText(hListView, index, 4, const_cast<LPWSTR>(wQuantity.c_str()));
-            ListView_SetItemText(hListView, index, 5, const_cast<LPWSTR>(wUnitCost.c_str()));
-            ListView_SetItemText(hListView, index, 6, const_cast<LPWSTR>(wCost.c_str()));
-            ListView_SetItemText(hListView, index, 7, const_cast<LPWSTR>(wNotes.c_str()));
-        }
-    }
-
-    void DeleteSelectedRow() {
-        int index = GetSelectedIndex();
-        if (index >= 0 && index < (int)rows.size()) {
-            rows.erase(rows.begin() + index);
-            ListView_DeleteItem(hListView, index);
-        }
-    }
-
-    int GetSelectedIndex() {
-        return ListView_GetNextItem(hListView, -1, LVNI_SELECTED);
-    }
-
-    bool GetSelectedRow(DataRow& outRow) {
-        int index = GetSelectedIndex();
-        if (index == -1 || index >= (int)rows.size()) {
-            return false;
-        }
-        outRow = rows[index];
-        return true;
-    }
-
-    double CalculateTotalCost() {
-        double total = 0.0;
-        for (const auto& row : rows) {
-            std::string costStr = row.cost;
-            costStr.erase(std::remove(costStr.begin(), costStr.end(), '$'), costStr.end());
-            costStr.erase(std::remove(costStr.begin(), costStr.end(), ','), costStr.end());
-            
-            try {
-                total += std::stod(costStr);
-            } catch (...) {
-                // Skip invalid values
-            }
-        }
-        return total;
-    }
-
-    int GetRowCount() { return rows.size(); }
-    HWND GetHandle() { return hListView; }
-};
-
 // Global variables
 DataTable* g_dataTable = nullptr;
 HWND g_hBtnAdd = NULL;
 HWND g_hBtnDelete = NULL;
 HWND g_hBtnEdit = NULL;
+HWND g_hBtnSave = NULL;
+HWND g_hBtnLoad = NULL;
 HWND g_hBtnSummary = NULL;
 HWND g_hStaticSummary = NULL;
+
+// Dialog data
+DataRow g_dialogData;
+bool g_dialogResult = false;
 
 // Layout constants
 const int MARGIN = 10;
@@ -250,157 +51,128 @@ const int BUTTON_WIDTH = 120;
 const int SUMMARY_HEIGHT = 60;
 const int BUTTON_SPACING = 10;
 
-// Helper function to calculate cost from quantity and unit cost
-std::string CalculateCost(const std::string& quantity, const std::string& unitCost) {
+// --- Helper: dialogue box for saving ---
+bool ShowSaveCSVDialog(HWND hwnd, std::wstring& outPath)
+{
+    wchar_t fileName[MAX_PATH] = L"";
+
+    OPENFILENAME ofn = {};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner   = hwnd;
+    ofn.lpstrFilter =
+        L"CSV Files (*.csv)\0*.csv\0"
+        L"All Files (*.*)\0*.*\0";
+    ofn.lpstrFile   = fileName;
+    ofn.nMaxFile    = MAX_PATH;
+    ofn.lpstrDefExt = L"csv";
+    ofn.Flags       = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
+
+    if (GetSaveFileName(&ofn))
+    {
+        outPath = fileName;
+        return true;
+    }
+    return false;
+}
+
+// --- Helper: dialogue box for loading ---
+bool ShowOpenCSVDialog(HWND hwnd, std::wstring& outPath)
+{
+    wchar_t fileName[MAX_PATH] = L"";
+
+    OPENFILENAME ofn = {};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd;
+    ofn.lpstrFilter = L"CSV Files (*.csv)\0*.csv\0All Files (*.*)\0*.*\0";
+    ofn.lpstrFile = fileName;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+    ofn.lpstrDefExt = L"csv";
+
+    if (GetOpenFileName(&ofn))
+    {
+        outPath = fileName;
+        return true;
+    }
+
+    return false;
+}
+
+// --- Helper: calculate total cost ---
+std::wstring CalculateCost(const std::wstring& quantity, const std::wstring& unitCost) {
     try {
+        std::wstring ucStr = unitCost;
+        ucStr.erase(std::remove(ucStr.begin(), ucStr.end(), L'$'), ucStr.end());
+        ucStr.erase(std::remove(ucStr.begin(), ucStr.end(), L','), ucStr.end());
+
         double qty = std::stod(quantity);
-        std::string ucStr = unitCost;
-        ucStr.erase(std::remove(ucStr.begin(), ucStr.end(), '$'), ucStr.end());
-        ucStr.erase(std::remove(ucStr.begin(), ucStr.end(), ','), ucStr.end());
         double uc = std::stod(ucStr);
-        
         double total = qty * uc;
-        std::ostringstream oss;
-        oss << "$" << std::fixed << std::setprecision(2) << total;
+
+        std::wostringstream oss;
+        oss << L"$" << std::fixed << std::setprecision(2) << total;
         return oss.str();
     } catch (...) {
-        return "$0.00";
+        return L"$0.00";
     }
 }
 
-// Dialog procedure for Add/Edit window
-INT_PTR CALLBACK EntryDialogProc(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam) {
-    switch (message) {
-        case WM_INITDIALOG: {
-            // Set window text based on whether we're adding or editing
-            if (g_dialogData.category.empty() && g_dialogData.item.empty()) {
-                SetWindowText(hwndDlg, L"Add New Entry");
-            } else {
-                SetWindowText(hwndDlg, L"Edit Entry");
-                // Populate fields with existing data
-                SetDlgItemText(hwndDlg, IDC_EDIT_CATEGORY, ToWide(g_dialogData.category).c_str());
-                SetDlgItemText(hwndDlg, IDC_EDIT_ITEM, ToWide(g_dialogData.item).c_str());
-                SetDlgItemText(hwndDlg, IDC_EDIT_MATERIAL, ToWide(g_dialogData.material).c_str());
-                SetDlgItemText(hwndDlg, IDC_EDIT_DESCRIPTION, ToWide(g_dialogData.description).c_str());
-                SetDlgItemText(hwndDlg, IDC_EDIT_QUANTITY, ToWide(g_dialogData.quantity).c_str());
-                SetDlgItemText(hwndDlg, IDC_EDIT_UNITCOST, ToWide(g_dialogData.unitCost).c_str());
-                SetDlgItemText(hwndDlg, IDC_EDIT_NOTES, ToWide(g_dialogData.notes).c_str());
-            }
-            return TRUE;
-        }
-
+// --- Dialog Window Procedure ---
+LRESULT CALLBACK DialogWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
         case WM_COMMAND: {
             switch (LOWORD(wParam)) {
                 case IDC_BTN_OK: {
-                    // Get text from all fields
                     wchar_t buffer[256];
-                    
-                    GetDlgItemText(hwndDlg, IDC_EDIT_CATEGORY, buffer, 256);
-                    g_dialogData.category = ToNarrow(buffer);
-                    
-                    GetDlgItemText(hwndDlg, IDC_EDIT_ITEM, buffer, 256);
-                    g_dialogData.item = ToNarrow(buffer);
-                    
-                    GetDlgItemText(hwndDlg, IDC_EDIT_MATERIAL, buffer, 256);
-                    g_dialogData.material = ToNarrow(buffer);
-                    
-                    GetDlgItemText(hwndDlg, IDC_EDIT_DESCRIPTION, buffer, 256);
-                    g_dialogData.description = ToNarrow(buffer);
-                    
-                    GetDlgItemText(hwndDlg, IDC_EDIT_QUANTITY, buffer, 256);
-                    g_dialogData.quantity = ToNarrow(buffer);
-                    
-                    GetDlgItemText(hwndDlg, IDC_EDIT_UNITCOST, buffer, 256);
-                    g_dialogData.unitCost = ToNarrow(buffer);
-                    
-                    GetDlgItemText(hwndDlg, IDC_EDIT_NOTES, buffer, 256);
-                    g_dialogData.notes = ToNarrow(buffer);
-                    
-                    // Calculate cost
+
+                    GetDlgItemText(hwnd, IDC_EDIT_CATEGORY, buffer, 256);
+                    g_dialogData.category = buffer;
+
+                    GetDlgItemText(hwnd, IDC_EDIT_ITEM, buffer, 256);
+                    g_dialogData.item = buffer;
+
+                    GetDlgItemText(hwnd, IDC_EDIT_MATERIAL, buffer, 256);
+                    g_dialogData.material = buffer;
+
+                    GetDlgItemText(hwnd, IDC_EDIT_DESCRIPTION, buffer, 256);
+                    g_dialogData.description = buffer;
+
+                    GetDlgItemText(hwnd, IDC_EDIT_QUANTITY, buffer, 256);
+                    g_dialogData.quantity = buffer;
+
+                    GetDlgItemText(hwnd, IDC_EDIT_UNITCOST, buffer, 256);
+                    g_dialogData.unitCost = buffer;
+
+                    GetDlgItemText(hwnd, IDC_EDIT_NOTES, buffer, 256);
+                    g_dialogData.notes = buffer;
+
                     g_dialogData.cost = CalculateCost(g_dialogData.quantity, g_dialogData.unitCost);
-                    
+
                     g_dialogResult = true;
-                    EndDialog(hwndDlg, IDOK);
-                    return TRUE;
+                    DestroyWindow(hwnd);
+                    return 0;
                 }
 
                 case IDC_BTN_CANCEL: {
                     g_dialogResult = false;
-                    EndDialog(hwndDlg, IDCANCEL);
-                    return TRUE;
+                    DestroyWindow(hwnd);
+                    return 0;
                 }
             }
             break;
         }
 
-        case WM_CLOSE: {
-            g_dialogResult = false;
-            EndDialog(hwndDlg, IDCANCEL);
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
-// Dialog window procedure
-LRESULT CALLBACK DialogWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-        case WM_COMMAND: {
-            if (LOWORD(wParam) == IDC_BTN_OK) {
-                // Get all the data
-                wchar_t buffer[256];
-                char narrowBuffer[256];
-                
-                GetDlgItemText(hwnd, IDC_EDIT_CATEGORY, buffer, 256);
-                WideCharToMultiByte(CP_UTF8, 0, buffer, -1, narrowBuffer, 256, NULL, NULL);
-                g_dialogData.category = narrowBuffer;
-                
-                GetDlgItemText(hwnd, IDC_EDIT_ITEM, buffer, 256);
-                WideCharToMultiByte(CP_UTF8, 0, buffer, -1, narrowBuffer, 256, NULL, NULL);
-                g_dialogData.item = narrowBuffer;
-                
-                GetDlgItemText(hwnd, IDC_EDIT_MATERIAL, buffer, 256);
-                WideCharToMultiByte(CP_UTF8, 0, buffer, -1, narrowBuffer, 256, NULL, NULL);
-                g_dialogData.material = narrowBuffer;
-                
-                GetDlgItemText(hwnd, IDC_EDIT_DESCRIPTION, buffer, 256);
-                WideCharToMultiByte(CP_UTF8, 0, buffer, -1, narrowBuffer, 256, NULL, NULL);
-                g_dialogData.description = narrowBuffer;
-                
-                GetDlgItemText(hwnd, IDC_EDIT_QUANTITY, buffer, 256);
-                WideCharToMultiByte(CP_UTF8, 0, buffer, -1, narrowBuffer, 256, NULL, NULL);
-                g_dialogData.quantity = narrowBuffer;
-                
-                GetDlgItemText(hwnd, IDC_EDIT_UNITCOST, buffer, 256);
-                WideCharToMultiByte(CP_UTF8, 0, buffer, -1, narrowBuffer, 256, NULL, NULL);
-                g_dialogData.unitCost = narrowBuffer;
-                
-                GetDlgItemText(hwnd, IDC_EDIT_NOTES, buffer, 256);
-                WideCharToMultiByte(CP_UTF8, 0, buffer, -1, narrowBuffer, 256, NULL, NULL);
-                g_dialogData.notes = narrowBuffer;
-                
-                g_dialogData.cost = CalculateCost(g_dialogData.quantity, g_dialogData.unitCost);
-                g_dialogResult = true;
-                DestroyWindow(hwnd);
-                return 0;
-            } else if (LOWORD(wParam) == IDC_BTN_CANCEL) {
-                g_dialogResult = false;
-                DestroyWindow(hwnd);
-                return 0;
-            }
-            break;
-        }
         case WM_CLOSE:
             g_dialogResult = false;
             DestroyWindow(hwnd);
             return 0;
     }
+
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-// Function to create the entry dialog dynamically
-HWND CreateEntryDialog(HWND hwndParent) {
-    // Register dialog window class
+// --- Create entry dialog programmatically ---
+HWND CreateEntryDialog(HWND hwndParent, bool isEdit) {
     static bool classRegistered = false;
     if (!classRegistered) {
         WNDCLASS wc = {};
@@ -413,20 +185,15 @@ HWND CreateEntryDialog(HWND hwndParent) {
         classRegistered = true;
     }
 
-    // Create a modal dialog programmatically
     HWND hwndDlg = CreateWindowEx(
         WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
         L"EntryDialogClass",
-        L"Entry Dialog",
+        isEdit ? L"Edit Entry" : L"Add New Entry",
         WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
         CW_USEDEFAULT, CW_USEDEFAULT, 500, 400,
-        hwndParent,
-        NULL,
-        GetModuleHandle(NULL),
-        NULL
+        hwndParent, NULL, GetModuleHandle(NULL), NULL
     );
 
-    // Create labels and edit controls
     int yPos = 20;
     int labelWidth = 100;
     int editWidth = 350;
@@ -444,14 +211,12 @@ HWND CreateEntryDialog(HWND hwndParent) {
         IDC_EDIT_NOTES
     };
 
-    for (int i = 0; i < 7; i++) {
-        // Create label
+    for (int i = 0; i < 7; ++i) {
         CreateWindow(L"STATIC", labels[i],
             WS_CHILD | WS_VISIBLE | SS_RIGHT,
             xLabel, yPos + 3, labelWidth, 20,
             hwndDlg, NULL, GetModuleHandle(NULL), NULL);
 
-        // Create edit control
         CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
             xEdit, yPos, editWidth, 25,
@@ -460,7 +225,6 @@ HWND CreateEntryDialog(HWND hwndParent) {
         yPos += rowHeight;
     }
 
-    // Create OK and Cancel buttons
     CreateWindow(L"BUTTON", L"OK",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
         150, yPos + 20, 80, 30,
@@ -471,193 +235,130 @@ HWND CreateEntryDialog(HWND hwndParent) {
         250, yPos + 20, 80, 30,
         hwndDlg, (HMENU)IDC_BTN_CANCEL, GetModuleHandle(NULL), NULL);
 
+    // Populate fields if editing
+    if (isEdit) {
+        SetDlgItemText(hwndDlg, IDC_EDIT_CATEGORY, g_dialogData.category.c_str());
+        SetDlgItemText(hwndDlg, IDC_EDIT_ITEM, g_dialogData.item.c_str());
+        SetDlgItemText(hwndDlg, IDC_EDIT_MATERIAL, g_dialogData.material.c_str());
+        SetDlgItemText(hwndDlg, IDC_EDIT_DESCRIPTION, g_dialogData.description.c_str());
+        SetDlgItemText(hwndDlg, IDC_EDIT_QUANTITY, g_dialogData.quantity.c_str());
+        SetDlgItemText(hwndDlg, IDC_EDIT_UNITCOST, g_dialogData.unitCost.c_str());
+        SetDlgItemText(hwndDlg, IDC_EDIT_NOTES, g_dialogData.notes.c_str());
+    }
+
     return hwndDlg;
 }
 
-// Function to show the entry dialog
+// --- Show entry dialog ---
 bool ShowEntryDialog(HWND hwndParent, DataRow& data, bool isEdit) {
     g_dialogData = data;
     g_dialogResult = false;
 
-    HWND hwndDlg = CreateEntryDialog(hwndParent);
-    
-    // Set title and populate fields
-    if (isEdit) {
-        SetWindowText(hwndDlg, L"Edit Entry");
-        
-        // Convert and set all fields
-        std::wstring wCategory(data.category.begin(), data.category.end());
-        std::wstring wItem(data.item.begin(), data.item.end());
-        std::wstring wMaterial(data.material.begin(), data.material.end());
-        std::wstring wDescription(data.description.begin(), data.description.end());
-        std::wstring wQuantity(data.quantity.begin(), data.quantity.end());
-        std::wstring wUnitCost(data.unitCost.begin(), data.unitCost.end());
-        std::wstring wNotes(data.notes.begin(), data.notes.end());
-        
-        SetDlgItemText(hwndDlg, IDC_EDIT_CATEGORY, wCategory.c_str());
-        SetDlgItemText(hwndDlg, IDC_EDIT_ITEM, wItem.c_str());
-        SetDlgItemText(hwndDlg, IDC_EDIT_MATERIAL, wMaterial.c_str());
-        SetDlgItemText(hwndDlg, IDC_EDIT_DESCRIPTION, wDescription.c_str());
-        SetDlgItemText(hwndDlg, IDC_EDIT_QUANTITY, wQuantity.c_str());
-        SetDlgItemText(hwndDlg, IDC_EDIT_UNITCOST, wUnitCost.c_str());
-        SetDlgItemText(hwndDlg, IDC_EDIT_NOTES, wNotes.c_str());
-    } else {
-        SetWindowText(hwndDlg, L"Add New Entry");
-    }
-
-    // Make parent window disabled
+    HWND hwndDlg = CreateEntryDialog(hwndParent, isEdit);
     EnableWindow(hwndParent, FALSE);
 
-    // Message loop for dialog
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        if (msg.message == WM_QUIT) {
-            PostQuitMessage((int)msg.wParam);
-            break;
-        }
-        
-        // Check if dialog is destroyed
-        if (!IsWindow(hwndDlg)) {
-            break;
-        }
-        
+    while (IsWindow(hwndDlg) && GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Clean up
-    if (IsWindow(hwndDlg)) {
-        DestroyWindow(hwndDlg);
-    }
     EnableWindow(hwndParent, TRUE);
     SetForegroundWindow(hwndParent);
 
-    if (g_dialogResult) {
-        data = g_dialogData;
-    }
-
+    if (g_dialogResult) data = g_dialogData;
     return g_dialogResult;
 }
 
-// Function to update layout on resize
-void UpdateLayout(HWND hwnd) {
-    RECT rc;
-    GetClientRect(hwnd, &rc);
-    
-    int clientWidth = rc.right - rc.left;
-    int clientHeight = rc.bottom - rc.top;
-    
-    int listViewHeight = clientHeight - (MARGIN * 3) - BUTTON_HEIGHT - SUMMARY_HEIGHT;
-    int buttonY = MARGIN + listViewHeight + MARGIN;
-    int summaryY = buttonY + BUTTON_HEIGHT + MARGIN;
-    
-    if (g_dataTable) {
-        SetWindowPos(g_dataTable->GetHandle(), NULL, 
-            MARGIN, MARGIN, 
-            clientWidth - (MARGIN * 2), listViewHeight, 
-            SWP_NOZORDER);
-    }
-    
-    int buttonX = MARGIN;
-    if (g_hBtnAdd) {
-        SetWindowPos(g_hBtnAdd, NULL, buttonX, buttonY, 
-            BUTTON_WIDTH, BUTTON_HEIGHT, SWP_NOZORDER);
-        buttonX += BUTTON_WIDTH + BUTTON_SPACING;
-    }
-    if (g_hBtnDelete) {
-        SetWindowPos(g_hBtnDelete, NULL, buttonX, buttonY, 
-            BUTTON_WIDTH, BUTTON_HEIGHT, SWP_NOZORDER);
-        buttonX += BUTTON_WIDTH + BUTTON_SPACING;
-    }
-    if (g_hBtnEdit) {
-        SetWindowPos(g_hBtnEdit, NULL, buttonX, buttonY, 
-            BUTTON_WIDTH, BUTTON_HEIGHT, SWP_NOZORDER);
-        buttonX += BUTTON_WIDTH + BUTTON_SPACING;
-    }
-    if (g_hBtnSummary) {
-        SetWindowPos(g_hBtnSummary, NULL, buttonX, buttonY, 
-            BUTTON_WIDTH + 20, BUTTON_HEIGHT, SWP_NOZORDER);
-    }
-    
-    if (g_hStaticSummary) {
-        SetWindowPos(g_hStaticSummary, NULL, 
-            MARGIN, summaryY, 
-            clientWidth - (MARGIN * 2), SUMMARY_HEIGHT, 
-            SWP_NOZORDER);
-    }
-}
-
-// Function to update summary display
+// --- Update summary ---
 void UpdateSummary() {
     if (!g_dataTable || !g_hStaticSummary) return;
-    
+
     int rowCount = g_dataTable->GetRowCount();
     double totalCost = g_dataTable->CalculateTotalCost();
-    
+
     std::wostringstream oss;
-    oss << L"Total Entries: " << rowCount << L"     |     "
-        << L"Total Cost: $" << std::fixed << std::setprecision(2) << totalCost;
-    
+    oss << L"Total Entries: " << rowCount
+        << L"     |     Total Cost: $" << std::fixed << std::setprecision(2) << totalCost;
+
     SetWindowText(g_hStaticSummary, oss.str().c_str());
 }
 
+// --- Update layout ---
+void UpdateLayout(HWND hwnd) {
+    RECT rc;
+    GetClientRect(hwnd, &rc);
+    int clientWidth = rc.right - rc.left;
+    int clientHeight = rc.bottom - rc.top;
+
+    int listViewHeight = clientHeight - (MARGIN * 3) - BUTTON_HEIGHT - SUMMARY_HEIGHT;
+    int buttonY = MARGIN + listViewHeight + MARGIN;
+    int summaryY = buttonY + BUTTON_HEIGHT + MARGIN;
+
+    if (g_dataTable)
+        SetWindowPos(g_dataTable->GetHandle(), NULL, MARGIN, MARGIN,
+                     clientWidth - 2 * MARGIN, listViewHeight, SWP_NOZORDER);
+
+    int buttonX = MARGIN;
+    if (g_hBtnAdd) SetWindowPos(g_hBtnAdd, NULL, buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT, SWP_NOZORDER);
+    buttonX += BUTTON_WIDTH + BUTTON_SPACING;
+    if (g_hBtnDelete) SetWindowPos(g_hBtnDelete, NULL, buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT, SWP_NOZORDER);
+    buttonX += BUTTON_WIDTH + BUTTON_SPACING;
+    if (g_hBtnEdit) SetWindowPos(g_hBtnEdit, NULL, buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT, SWP_NOZORDER);
+    buttonX += BUTTON_WIDTH + BUTTON_SPACING;
+    if (g_hBtnSummary) SetWindowPos(g_hBtnSummary, NULL, buttonX, buttonY, BUTTON_WIDTH + 20, BUTTON_HEIGHT, SWP_NOZORDER);
+
+    int rightX = clientWidth - MARGIN;
+
+    if (g_hBtnLoad) {
+        rightX -= BUTTON_WIDTH;
+        SetWindowPos(g_hBtnLoad, NULL, rightX, buttonY,
+            BUTTON_WIDTH, BUTTON_HEIGHT, SWP_NOZORDER);
+        rightX -= BUTTON_SPACING;
+    }
+
+    if (g_hBtnSave) {
+        rightX -= BUTTON_WIDTH;
+        SetWindowPos(g_hBtnSave, NULL, rightX, buttonY,
+            BUTTON_WIDTH, BUTTON_HEIGHT, SWP_NOZORDER);
+    }
+
+    if (g_hStaticSummary) SetWindowPos(g_hStaticSummary, NULL, MARGIN, summaryY, clientWidth - 2 * MARGIN, SUMMARY_HEIGHT, SWP_NOZORDER);
+}
+
+// --- Main Window Procedure ---
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_CREATE: {
             INITCOMMONCONTROLSEX icex = {};
-            icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+            icex.dwSize = sizeof(icex);
             icex.dwICC = ICC_LISTVIEW_CLASSES;
             InitCommonControlsEx(&icex);
 
             g_dataTable = new DataTable(hwnd, 0, 0, 100, 100);
 
-            g_dataTable->AddRow({"Electronics", "Laptop", "Aluminum", 
-                "15-inch display", "5", "$899.99", "$4499.95", 
-                "Bulk order discount"});
-            
-            g_dataTable->AddRow({"Office", "Desk Chair", "Mesh/Steel", 
-                "Ergonomic office chair", "10", "$249.50", "$2495.00", 
-                "Free shipping"});
-            
-            g_dataTable->AddRow({"Supplies", "Paper Reams", "Paper", 
-                "500 sheets per ream", "50", "$4.99", "$249.50", 
-                "Recycled paper"});
+            g_dataTable->AddRow({L"Electronics", L"Laptop", L"Aluminum", L"15-inch display", L"5", L"$899.99", L"$4499.95", L"Bulk order discount"});
+            g_dataTable->AddRow({L"Office", L"Desk Chair", L"Mesh/Steel", L"Ergonomic office chair", L"10", L"$249.50", L"$2495.00", L"Free shipping"});
+            g_dataTable->AddRow({L"Supplies", L"Paper Reams", L"Paper", L"500 sheets per ream", L"50", L"$4.99", L"$249.50", L"Recycled paper"});
 
-            g_hBtnAdd = CreateWindowW(L"BUTTON", L"Add Entry",
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                0, 0, 100, 30,
-                hwnd, (HMENU)ID_BTN_ADD, GetModuleHandle(NULL), NULL);
+            g_hBtnAdd = CreateWindowW(L"BUTTON", L"Add Entry", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 0, 0, 100, 30, hwnd, (HMENU)ID_BTN_ADD, GetModuleHandle(NULL), NULL);
+            g_hBtnDelete = CreateWindowW(L"BUTTON", L"Delete Entry", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 0, 0, 100, 30, hwnd, (HMENU)ID_BTN_DELETE, GetModuleHandle(NULL), NULL);
+            g_hBtnEdit = CreateWindowW(L"BUTTON", L"Edit Entry", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 0, 0, 100, 30, hwnd, (HMENU)ID_BTN_EDIT, GetModuleHandle(NULL), NULL);
+            g_hBtnSummary = CreateWindowW(L"BUTTON", L"Calculate Summary", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON, 0, 0, 100, 30, hwnd, (HMENU)ID_BTN_SUMMARY, GetModuleHandle(NULL), NULL);
+            g_hBtnSave = CreateWindowW(L"BUTTON", L"Save", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 0, 0, 100, 30, hwnd, (HMENU)ID_BTN_SAVE, GetModuleHandle(NULL), NULL);
+            g_hBtnLoad = CreateWindowW(L"BUTTON", L"Load", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 0, 0, 100, 30, hwnd, (HMENU)ID_BTN_LOAD, GetModuleHandle(NULL), NULL);
 
-            g_hBtnDelete = CreateWindowW(L"BUTTON", L"Delete Entry",
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                0, 0, 100, 30,
-                hwnd, (HMENU)ID_BTN_DELETE, GetModuleHandle(NULL), NULL);
-
-            g_hBtnEdit = CreateWindowW(L"BUTTON", L"Edit Entry",
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                0, 0, 100, 30,
-                hwnd, (HMENU)ID_BTN_EDIT, GetModuleHandle(NULL), NULL);
-
-            g_hBtnSummary = CreateWindowW(L"BUTTON", L"Calculate Summary",
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-                0, 0, 100, 30,
-                hwnd, (HMENU)ID_BTN_SUMMARY, GetModuleHandle(NULL), NULL);
-
-            g_hStaticSummary = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"",
-                WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
-                0, 0, 100, 50,
-                hwnd, (HMENU)ID_STATIC_SUMMARY, GetModuleHandle(NULL), NULL);
+            g_hStaticSummary = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE, 0, 0, 100, 50, hwnd, (HMENU)ID_STATIC_SUMMARY, GetModuleHandle(NULL), NULL);
 
             UpdateLayout(hwnd);
             UpdateSummary();
-
             return 0;
         }
 
         case WM_COMMAND: {
             switch (LOWORD(wParam)) {
                 case ID_BTN_ADD: {
-                    DataRow newRow = {"", "", "", "", "1", "$0.00", "$0.00", ""};
+                    DataRow newRow = {L"", L"", L"", L"", L"1", L"$0.00", L"$0.00", L""};
                     if (ShowEntryDialog(hwnd, newRow, false)) {
                         g_dataTable->AddRow(newRow);
                         UpdateSummary();
@@ -668,16 +369,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 case ID_BTN_DELETE: {
                     DataRow selectedRow;
                     if (g_dataTable->GetSelectedRow(selectedRow)) {
-                        int result = MessageBox(hwnd, 
-                            L"Are you sure you want to delete the selected entry?", 
-                            L"Confirm Delete", MB_YESNO | MB_ICONQUESTION);
-                        if (result == IDYES) {
+                        if (MessageBox(hwnd, L"Are you sure you want to delete the selected entry?", L"Confirm Delete", MB_YESNO | MB_ICONQUESTION) == IDYES) {
                             g_dataTable->DeleteSelectedRow();
                             UpdateSummary();
                         }
                     } else {
-                        MessageBox(hwnd, L"Please select an entry to delete!", 
-                            L"No Selection", MB_OK | MB_ICONWARNING);
+                        MessageBox(hwnd, L"Please select an entry to delete!", L"No Selection", MB_OK | MB_ICONWARNING);
                     }
                     break;
                 }
@@ -691,8 +388,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                             UpdateSummary();
                         }
                     } else {
-                        MessageBox(hwnd, L"Please select an entry to edit!", 
-                            L"No Selection", MB_OK | MB_ICONWARNING);
+                        MessageBox(hwnd, L"Please select an entry to edit!", L"No Selection", MB_OK | MB_ICONWARNING);
                     }
                     break;
                 }
@@ -701,37 +397,78 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     UpdateSummary();
                     int rowCount = g_dataTable->GetRowCount();
                     double totalCost = g_dataTable->CalculateTotalCost();
-                    
+
                     std::wostringstream oss;
-                    oss << L"Summary Report\n\n"
-                        << L"Total Number of Entries: " << rowCount << L"\n"
-                        << L"Total Cost: $" << std::fixed << std::setprecision(2) << totalCost << L"\n"
-                        << L"Average Cost per Entry: $" 
-                        << (rowCount > 0 ? totalCost / rowCount : 0.0);
-                    
-                    MessageBox(hwnd, oss.str().c_str(), 
-                        L"Cost Summary", MB_OK | MB_ICONINFORMATION);
+                    oss << L"Summary Report\n\nTotal Entries: " << rowCount
+                        << L"\nTotal Cost: $" << std::fixed << std::setprecision(2) << totalCost
+                        << L"\nAverage Cost per Entry: $" << (rowCount > 0 ? totalCost / rowCount : 0.0);
+
+                    MessageBox(hwnd, oss.str().c_str(), L"Cost Summary", MB_OK | MB_ICONINFORMATION);
                     break;
                 }
+
+                case ID_BTN_SAVE: {
+                    std::wstring filePath;
+
+                    if (ShowSaveCSVDialog(hwnd, filePath))
+                    {
+                        if (SpreadsheetStorage::SaveToCSV(filePath, g_dataTable->GetAllRows()))
+                        {
+                            MessageBox(hwnd, L"File saved successfully.",
+                                    L"Saved", MB_OK | MB_ICONINFORMATION);
+                        }
+                        else {
+                            MessageBox(hwnd, L"Failed to save file.",
+                                    L"Error", MB_OK | MB_ICONERROR);
+                        }
+                    }
+                    break;
+                }
+
+
+                case ID_BTN_LOAD: {
+                    std::wstring filePath;
+
+                    if (!ShowOpenCSVDialog(hwnd, filePath))
+                        break;  // User cancelled
+
+                    std::vector<DataRow> rows;
+
+                    if (SpreadsheetStorage::LoadFromCSV(filePath, rows))
+                    {
+                        g_dataTable->Clear();
+
+                        for (const auto& r : rows)
+                            g_dataTable->AddRow(r);
+
+                        InvalidateRect(g_dataTable->GetHandle(), NULL, TRUE);
+                        UpdateWindow(g_dataTable->GetHandle());
+                    }
+                    else {
+                        MessageBox(hwnd, L"Load failed.", L"Error", MB_OK | MB_ICONERROR);
+                    }
+                    break;
+                }
+
             }
             return 0;
         }
 
-        case WM_SIZE: {
+        case WM_SIZE:
             UpdateLayout(hwnd);
             return 0;
-        }
 
         case WM_DESTROY:
             delete g_dataTable;
             PostQuitMessage(0);
             return 0;
     }
+
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, 
-                   LPSTR lpCmdLine, int nCmdShow) {
+// --- WinMain ---
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     const wchar_t CLASS_NAME[] = L"DataTableWindow";
 
     WNDCLASS wc = {};
@@ -743,12 +480,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindowEx(0, CLASS_NAME, L"Cost Tracker - Spreadsheet",
-        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 
-        950, 550, NULL, NULL, hInstance, NULL);
+        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 950, 550,
+        NULL, NULL, hInstance, NULL);
 
-    if (hwnd == NULL) return 0;
+    if (!hwnd) return 0;
 
     ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
 
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
