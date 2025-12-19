@@ -337,10 +337,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             g_dataTable = new DataTable(hwnd, 0, 0, 100, 100);
 
-            g_dataTable->AddRow({L"Electronics", L"Laptop", L"Aluminum", L"15-inch display", L"5", L"$899.99", L"$4499.95", L"Bulk order discount"});
-            g_dataTable->AddRow({L"Office", L"Desk Chair", L"Mesh/Steel", L"Ergonomic office chair", L"10", L"$249.50", L"$2495.00", L"Free shipping"});
-            g_dataTable->AddRow({L"Supplies", L"Paper Reams", L"Paper", L"500 sheets per ream", L"50", L"$4.99", L"$249.50", L"Recycled paper"});
-
             g_hBtnAdd = CreateWindowW(L"BUTTON", L"Add Entry", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 0, 0, 100, 30, hwnd, (HMENU)ID_BTN_ADD, GetModuleHandle(NULL), NULL);
             g_hBtnDelete = CreateWindowW(L"BUTTON", L"Delete Entry", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 0, 0, 100, 30, hwnd, (HMENU)ID_BTN_DELETE, GetModuleHandle(NULL), NULL);
             g_hBtnEdit = CreateWindowW(L"BUTTON", L"Edit Entry", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 0, 0, 100, 30, hwnd, (HMENU)ID_BTN_EDIT, GetModuleHandle(NULL), NULL);

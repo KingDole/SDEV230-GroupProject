@@ -1,3 +1,6 @@
+//Header for the DataTable class. The purpose of the class is to create the table to hold all of the information 
+//the user inputs for their spreadsheet.
+
 #pragma once
 #include <windows.h>
 #include <commctrl.h>
