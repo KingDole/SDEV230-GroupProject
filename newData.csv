@@ -1,5 +1,5 @@
 Category,Item,Material,Description,Quantity,Unit Cost,Cost,Notes
 Electronics,Laptop,Aluminum,15-inch display,5,$899.99,$4499.95,Bulk order discount
 Office,Desk Chair,Mesh/Steel,Ergonomic office chair,10,$249.50,$2495.00,Free shipping
-Supplies,Paper Reams,Paper,500 sheets per ream,50,$4.99,$249.50,Recycled paper
-Office,Pens,N/A,100 Count Pens,3,13.99,$41.97,Pens for the office
+Supplies,Paper Reams,Paper,500 sheets per ream,50,$5.99,$299.50,Recycled paper
+Office,Pens,N/A,100 Count Pens,3,$13.99,$41.97,Pens for the office
