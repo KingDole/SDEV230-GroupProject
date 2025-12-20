@@ -78,19 +78,13 @@ bool ShowSaveCSVDialog(HWND hwnd, std::wstring& outPath)
 // --- Helper function to validate float input ---
 bool IsValidFloat(const std::wstring& str) {
     if (str.empty()) return false;
-    
-    // Remove whitespace
     std::wstring trimmed = str;
     trimmed.erase(0, trimmed.find_first_not_of(L" \t\n\r"));
     trimmed.erase(trimmed.find_last_not_of(L" \t\n\r") + 1);
-    
     if (trimmed.empty()) return false;
-    
-    // Try to convert to double
     try {
         size_t pos = 0;
         std::stod(trimmed, &pos);
-        // Check if entire string was consumed (no invalid characters at end)
         return pos == trimmed.length();
     } catch (...) {
         return false;
@@ -147,30 +141,24 @@ LRESULT CALLBACK DialogWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
                 case IDC_BTN_OK: {
                     wchar_t buffer[256];
 
-                    // Get quantity and unit cost first for validation
                     GetDlgItemText(hwnd, IDC_EDIT_QUANTITY, buffer, 256);
                     std::wstring quantityStr = buffer;
 
                     GetDlgItemText(hwnd, IDC_EDIT_UNITCOST, buffer, 256);
                     std::wstring unitCostStr = buffer;
                     
-                    // Remove $ and commas from unit cost for validation
                     std::wstring unitCostClean = unitCostStr;
                     unitCostClean.erase(std::remove(unitCostClean.begin(), unitCostClean.end(), L'$'), unitCostClean.end());
                     unitCostClean.erase(std::remove(unitCostClean.begin(), unitCostClean.end(), L','), unitCostClean.end());
 
-                    // Validate quantity
                     if (!IsValidFloat(quantityStr)) {
-                        MessageBox(hwnd, L"Quantity must be a valid number!", 
-                                   L"Invalid Input", MB_OK | MB_ICONERROR);
+                        MessageBox(hwnd, L"Quantity must be a valid number!", L"Invalid Input", MB_OK | MB_ICONERROR);
                         SetFocus(GetDlgItem(hwnd, IDC_EDIT_QUANTITY));
                         return 0;
                     }
 
-                    // Validate unit cost
                     if (!IsValidFloat(unitCostClean)) {
-                        MessageBox(hwnd, L"Unit Cost must be a valid number!", 
-                                   L"Invalid Input", MB_OK | MB_ICONERROR);
+                        MessageBox(hwnd, L"Unit Cost must be a valid number!", L"Invalid Input", MB_OK | MB_ICONERROR);
                         SetFocus(GetDlgItem(hwnd, IDC_EDIT_UNITCOST));
                         return 0;
                     }
@@ -189,14 +177,6 @@ LRESULT CALLBACK DialogWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
 
                     GetDlgItemText(hwnd, IDC_EDIT_DESCRIPTION, buffer, 256);
                     g_dialogData.description = buffer;
-
-                    /*
-                    GetDlgItemText(hwnd, IDC_EDIT_QUANTITY, buffer, 256);
-                    g_dialogData.quantity = buffer;
-
-                    GetDlgItemText(hwnd, IDC_EDIT_UNITCOST, buffer, 256);
-                    g_dialogData.unitCost = buffer;
-                    */
                    
                     GetDlgItemText(hwnd, IDC_EDIT_NOTES, buffer, 256);
                     g_dialogData.notes = buffer;
